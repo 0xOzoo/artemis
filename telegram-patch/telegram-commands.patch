@@ -1,0 +1,162 @@
+--- a/server.ts
++++ b/server.ts
+@@ -21,7 +21,8 @@
+ import { randomBytes } from 'crypto'
+ import { readFileSync, writeFileSync, mkdirSync, readdirSync, rmSync, statSync, renameSync, realpathSync, chmodSync } from 'fs'
+ import { homedir } from 'os'
+-import { execFileSync } from 'child_process'
++import { execFileSync, execFile } from 'child_process'
++import { promisify } from 'util'
+ import { join, extname, sep } from 'path'
+ 
+ const STATE_DIR = process.env.TELEGRAM_STATE_DIR
+@@ -732,6 +733,121 @@
+   await ctx.reply(`Not paired. Send me a message to get a pairing code.`)
+ })
+ 
++// ARTEMIS-PATCH : /clear, /usage, /opus, /sonnet et vocaux. Écrasé à chaque mise à jour du plugin :
++// relancer patch-telegram.sh (dépôt Artemis). Variables exportées par artemis.sh depuis son .env.
++const TMUX_TARGET = process.env.TMUX_SESSION || 'artemis'
++const ARTEMIS_DIR = process.env.ARTEMIS_DIR || join(homedir(), 'artemis')
++function tmuxKeys(...args: string[]): void {
++  execFileSync('tmux', ['send-keys', '-t', TMUX_TARGET, ...args])
++}
++function typeSlash(cmd: string): void {
++  tmuxKeys('-l', cmd)
++  tmuxKeys('Enter')
++}
++
++bot.command('clear', async ctx => {
++  const gated = dmCommandGate(ctx)
++  if (!gated || !gated.access.allowFrom.includes(gated.senderId)) return
++  try {
++    typeSlash('/clear')
++  } catch (e) {
++    await ctx.reply(`Échec /clear : ${e}`)
++    return
++  }
++  const deleted = await wipeChat(ctx.chat!.id, ctx.message!.message_id)
++  await ctx.reply(`Contexte vidé, ${deleted} messages effacés.`)
++})
++
++// Les ids d'un chat privé se suivent : on efface à l'aveugle de l'id courant jusqu'à 1 (toute la conversation).
++// Telegram refuse au-delà de 48 h : on s'arrête au premier lot refusé.
++async function wipeChat(chatId: number, fromId: number): Promise<number> {
++  const floor = 0
++  let count = 0
++  for (let hi = fromId; hi > floor; hi -= 100) {
++    const ids: number[] = []
++    for (let id = hi; id > Math.max(floor, hi - 100); id--) ids.push(id)
++    try {
++      await bot.api.deleteMessages(chatId, ids)
++      count += ids.length
++    } catch (e) {
++      process.stderr.write(`wipeChat stop at ${hi}: ${e}\n`)
++      break
++    }
++  }
++  return count
++}
++
++bot.command('usage', async ctx => {
++  const gated = dmCommandGate(ctx)
++  if (!gated || !gated.access.allowFrom.includes(gated.senderId)) return
++  try {
++    typeSlash('/usage')
++    await new Promise(r => setTimeout(r, 4000))
++    const pane = execFileSync('tmux', ['capture-pane', '-pt', TMUX_TARGET], { encoding: 'utf8' })
++    tmuxKeys('Escape')
++    const text = pane.split('\n').map(l => l.trimEnd()).filter(l => l.trim()).join('\n')
++    await ctx.reply(text.slice(0, 4000) || '(écran vide)')
++  } catch (e) {
++    await ctx.reply(`Échec /usage : ${e}`)
++  }
++})
++
++// /opus et /sonnet : bascule la session entière (la conversation est gardée), puis renvoie la ligne d'état.
++for (const model of ['opus', 'sonnet']) {
++  bot.command(model, async ctx => {
++    const gated = dmCommandGate(ctx)
++    if (!gated || !gated.access.allowFrom.includes(gated.senderId)) return
++    // /model enregistre aussi le modèle comme défaut global dans settings.json : on remet la valeur d'avant,
++    // sinon toutes les autres sessions changeraient de modèle.
++    const SETTINGS = join(homedir(), '.claude', 'settings.json')
++    const MODEL_RE = /"model":\s*"[^"]*"/
++    const saved = readFileSync(SETTINGS, 'utf8').match(MODEL_RE)?.[0]
++    try {
++      typeSlash(`/model ${model}`)
++      await new Promise(r => setTimeout(r, 2000))
++      if (saved) {
++        const now = readFileSync(SETTINGS, 'utf8')
++        if (now.match(MODEL_RE)?.[0] !== saved) writeFileSync(SETTINGS, now.replace(MODEL_RE, saved))
++      }
++      const pane = execFileSync('tmux', ['capture-pane', '-pt', TMUX_TARGET], { encoding: 'utf8' })
++      const line = pane.split('\n').reverse().find(l => /model|modèle|effort/i.test(l))?.trim()
++      await ctx.reply(line || `/model ${model} envoyé.`)
++    } catch (e) {
++      await ctx.reply(`Échec /${model} : ${e}`)
++    }
++  })
++}
++
++// Claude ne peut ni écouter ni regarder → vocaux/vidéos transcrits par Whisper (voice/media.py,
++// installé par ./install.sh --voice) et vidéos résumées en une planche de 6 images envoyée comme image_path.
++const MEDIA_KINDS = new Set(['voice', 'audio', 'video', 'video_note'])
++const MEDIA_PY = join(ARTEMIS_DIR, 'voice', 'media.py')
++const MEDIA_VENV_PY = join(ARTEMIS_DIR, '.venv', 'bin', 'python')
++async function describeMedia(fileId: string): Promise<{ note: string, sheet?: string }> {
++  try { statSync(MEDIA_VENV_PY) } catch {
++    return { note: "Vocaux/vidéos non activés sur cette machine (./install.sh --voice) : contenu non lu." }
++  }
++  try {
++    const file = await bot.api.getFile(fileId)
++    if (!file.file_path) throw new Error('pas de file_path')
++    const res = await fetch(`https://api.telegram.org/file/bot${TOKEN}/${file.file_path}`)
++    if (!res.ok) throw new Error(`HTTP ${res.status}`)
++    const ext = (file.file_path.split('.').pop() ?? 'bin').replace(/[^a-zA-Z0-9]/g, '') || 'bin'
++    const path = join(INBOX_DIR, `${Date.now()}-${(file.file_unique_id ?? 'dl').replace(/[^a-zA-Z0-9_-]/g, '')}.${ext}`)
++    mkdirSync(INBOX_DIR, { recursive: true })
++    writeFileSync(path, Buffer.from(await res.arrayBuffer()))
++    const { stdout } = await promisify(execFile)(MEDIA_VENV_PY, ['-I', MEDIA_PY, path], { timeout: 600_000 })
++    const r = JSON.parse(stdout) as { transcript: string, sheet: string | null }
++    const parts = [`Fichier : ${path}`]
++    parts.push(r.transcript ? `Transcription (Whisper, peut contenir des erreurs) : « ${r.transcript} »` : 'Aucune parole détectée.')
++    if (r.sheet) parts.push('image_path = planche de 6 images réparties sur la vidéo.')
++    return { note: parts.join('\n'), sheet: r.sheet ?? undefined }
++  } catch (e) {
++    // Telegram refuse au bot les fichiers > 20 Mo : ça finit ici.
++    return { note: `Transcription impossible : ${e}` }
++  }
++}
++
+ // Inline-button handler for permission requests. Callback data is
+ // `perm:allow:<id>`, `perm:deny:<id>`, or `perm:more:<id>`.
+ // Security mirrors the text-reply path: allowFrom must contain the sender.
+@@ -963,7 +1079,15 @@
+       .catch(() => {})
+   }
+ 
+-  const imagePath = downloadImage ? await downloadImage() : undefined
++  let imagePath = downloadImage ? await downloadImage() : undefined
++
++  if (attachment && MEDIA_KINDS.has(attachment.kind)) {
++    // la transcription dure plus que les ~5 s d'un "typing"
++    const typing = setInterval(() => void bot.api.sendChatAction(chat_id, 'typing').catch(() => {}), 4000)
++    const media = await describeMedia(attachment.file_id).finally(() => clearInterval(typing))
++    text = `${text}\n\n${media.note}`
++    imagePath = media.sheet ?? imagePath
++  }
+ 
+   // image_path goes in meta only — an in-content "[image attached — read: PATH]"
+   // annotation is forgeable by any allowlisted sender typing that string.
+@@ -1016,6 +1140,10 @@
+               { command: 'start', description: 'Welcome and setup guide' },
+               { command: 'help', description: 'What this bot can do' },
+               { command: 'status', description: 'Check your pairing status' },
++              { command: 'clear', description: 'Vider le contexte de la session' },
++              { command: 'usage', description: 'Consommation et limites' },
++              { command: 'opus', description: 'Passer la session sur Opus (questions complexes)' },
++              { command: 'sonnet', description: 'Revenir sur Sonnet' },
+             ],
+             { scope: { type: 'all_private_chats' } },
+           ).catch(() => {})

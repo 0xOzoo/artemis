@@ -1,0 +1,11 @@
+# Secrets et état local : jamais dans le dépôt
+.env
+*.env
+!.env.example
+access.json
+*.log
+*.pyc
+__pycache__/
+.venv/
+node_modules/
+colis/colis.json

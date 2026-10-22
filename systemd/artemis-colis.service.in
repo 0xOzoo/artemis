@@ -1,0 +1,7 @@
+[Unit]
+Description=Artemis : alerte Telegram sur les colis surveillés
+
+[Service]
+Type=oneshot
+WorkingDirectory=@INSTALL_DIR@/colis
+ExecStart=/usr/bin/env python3 colis.py check

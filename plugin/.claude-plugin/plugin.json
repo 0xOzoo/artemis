@@ -1,0 +1,5 @@
+{
+  "name": "artemis",
+  "description": "Skills et agents d'Artemis, chargés seulement par la session Telegram (--plugin-dir dans artemis.sh)",
+  "version": "1.0.0"
+}

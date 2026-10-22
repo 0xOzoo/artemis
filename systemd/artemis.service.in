@@ -1,0 +1,14 @@
+[Unit]
+Description=Artemis : session Claude Code pilotée depuis Telegram
+After=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# PATH rempli par install.sh : node >= 22 (MCP obsidian), bun (plugin telegram), claude.
+Environment=PATH=@PATH@
+ExecStart=@TMUX@ new-session -d -s @SESSION@ -x 200 -y 50 -c %h @INSTALL_DIR@/artemis.sh
+ExecStop=@TMUX@ kill-session -t @SESSION@
+
+[Install]
+WantedBy=default.target

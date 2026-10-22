@@ -1,0 +1,119 @@
+#!/usr/bin/env bash
+# Teste install.sh hors ligne, dans un HOME jetable, avec claude/systemctl/tmux/... simulés.
+# Ne touche ni au vrai ~/.claude, ni à systemd, ni au réseau.
+set -euo pipefail
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
+export HOME="$T/home"; mkdir -p "$HOME/.local/bin" "$HOME/.claude"
+echo '{}' > "$HOME/.claude/.credentials.json"
+cp -r "$REPO" "$T/repo"; rm -rf "$T/repo/.env" "$T/repo/.venv"
+B="$HOME/.local/bin"
+# shellcheck disable=SC2016 # $* et $HOME doivent s'étendre dans les stubs, pas ici
+for c in systemctl loginctl tmux bun node unzip curl ffmpeg; do printf '#!/bin/sh\necho "%s $*" >> "$HOME/calls.log"\n' "$c" > "$B/$c"; done
+cat > "$B/claude" <<'EOF'
+#!/bin/sh
+echo "claude $*" >> "$HOME/calls.log"
+[ "$1 $2" = "mcp get" ] && exit 1
+exit 0
+EOF
+# python3 simulé pour --voice : « -m venv » crée un pip qui pose un marqueur ; le python du venv réussit ensuite.
+cat > "$B/python3" <<'EOF'
+#!/bin/sh
+echo "python3 $*" >> "$HOME/calls.log"
+[ "$1" = -m ] || exit 0
+mkdir -p "$3/bin"
+printf '#!/bin/sh\necho "pip $*" >> "$HOME/calls.log"; touch "%s/ok"\n' "$3" > "$3/bin/pip"
+printf '#!/bin/sh\n[ -f "%s/ok" ]\n' "$3" > "$3/bin/python"
+chmod +x "$3/bin/pip" "$3/bin/python"
+EOF
+chmod +x "$B"/*
+export PATH="$B:/usr/bin:/bin"
+
+# Faux plugin telegram : server.ts reconstruit à partir du contexte du patch (lignes « » et « - »).
+PLUG="$HOME/.claude/plugins/cache/claude-plugins-official/telegram/0.0.7"
+mkdir -p "$PLUG"
+grep -E '^[ -]' "$REPO/telegram-patch/telegram-commands.patch" | grep -v '^--- ' | cut -c2- > "$PLUG/server.ts"
+cp "$PLUG/server.ts" "$T/server.ts.pristine"
+
+fail() { echo "ÉCHEC : $*"; exit 1; }
+
+# 1. sans .env : il le crée et s'arrête
+! "$T/repo/install.sh" 2>/dev/null || fail "aurait dû s'arrêter sans .env"
+[ -f "$T/repo/.env" ] || fail ".env non créé"
+
+# 2. jeton mal formé : refusé
+sed -i 's|^TELEGRAM_BOT_TOKEN=.*|TELEGRAM_BOT_TOKEN=nimporte-quoi|' "$T/repo/.env"
+! "$T/repo/install.sh" 2>/dev/null || fail "jeton invalide accepté"
+
+# 3. installation complète, deux fois (idempotence)
+sed -i 's|^TELEGRAM_BOT_TOKEN=.*|TELEGRAM_BOT_TOKEN=123456789:AAtesttesttesttesttesttesttesttest12|' "$T/repo/.env"
+"$T/repo/install.sh" --starter >/dev/null
+echo "note perso" >> "$HOME/cerveau/cuisine/recettes.md"
+"$T/repo/install.sh" --starter=cuisine >/dev/null
+
+U="$HOME/.config/systemd/user/artemis.service"
+! grep -q @ "$U" || fail "variables non remplacées dans le service"
+grep -q "$T/repo/artemis.sh" "$U" || fail "chemin d'installation absent du service"
+[ "$(stat -c %a "$HOME/.claude/channels/telegram/.env")" = 600 ] || fail "droits du jeton"
+grep -qx 'TELEGRAM_BOT_TOKEN=123456789:AAtesttesttesttesttesttesttesttest12' "$HOME/.claude/channels/telegram/.env" || fail "jeton"
+[ "$(grep -c '^## Cuisine' "$HOME/cerveau/INDEX.md")" = 1 ] || fail "section Cuisine dupliquée"
+grep -q "note perso" "$HOME/cerveau/cuisine/recettes.md" || fail "note de l'utilisateur écrasée"
+[ ! -e "$HOME/cerveau/cuisine/_index.md" ] || fail "_index.md copié dans le coffre"
+grep -q "plugin disable telegram@claude-plugins-official" "$HOME/calls.log" || fail "plugin non désactivé globalement"
+grep -q "mcp add -s user obsidian" "$HOME/calls.log" || fail "MCP obsidian non ajouté"
+
+# 3b. patch du plugin telegram : appliqué une fois, original sauvé
+[ "$(grep -c ARTEMIS-PATCH "$PLUG/server.ts")" = 1 ] || fail "patch telegram non appliqué (ou deux fois)"
+cmp -s "$PLUG/server.ts.orig" "$T/server.ts.pristine" || fail "original du plugin non sauvé"
+grep -q "bot.command('clear'" "$PLUG/server.ts" || fail "commande /clear absente"
+"$T/repo/patch-telegram.sh" | grep -q "Déjà patché" || fail "patch non idempotent"
+# plugin mis à jour avec un server.ts incompatible : échec explicite, fichier intact, l'installation continue
+NEW="$(dirname "$PLUG")/0.0.8"
+mkdir -p "$NEW"; echo "// autre version" > "$NEW/server.ts"
+! "$T/repo/patch-telegram.sh" 2>"$T/err" || fail "patch appliqué sur une version incompatible"
+grep -q "0.0.8" "$T/err" || fail "version du plugin non signalée"
+[ "$(cat "$NEW/server.ts")" = "// autre version" ] || fail "plugin incompatible modifié"
+"$T/repo/install.sh" 2>"$T/err" >/dev/null || fail "installation bloquée par le patch"
+grep -q "Patch du plugin telegram non appliqué" "$T/err" || fail "échec du patch silencieux"
+rm -rf "$NEW"
+
+# 3c. alerte colis : timer seulement si SHIP24_API_KEY est remplie, retiré si elle est vidée
+CU="$HOME/.config/systemd/user/artemis-colis"
+[ ! -e "$CU.timer" ] || fail "timer colis installé sans clé"
+sed -i 's|^SHIP24_API_KEY=.*|SHIP24_API_KEY=cle-de-test|' "$T/repo/.env"
+"$T/repo/install.sh" >/dev/null
+[ -f "$CU.timer" ] && grep -q "WorkingDirectory=$T/repo/colis" "$CU.service" || fail "timer colis absent ou mal rempli"
+grep -q "enable --now artemis-colis.timer" "$HOME/calls.log" || fail "timer colis non activé"
+sed -i 's|^SHIP24_API_KEY=.*|SHIP24_API_KEY=|' "$T/repo/.env"
+"$T/repo/install.sh" >/dev/null
+[ ! -e "$CU.timer" ] || fail "timer colis gardé sans clé"
+# scripts colis, hors ligne : détection du transporteur, clé absente signalée, liste vide
+( cd "$T/repo/colis" && export COLIS_FILE="$T/colis.json" && /usr/bin/python3 -c '
+import suivi_colis as s
+assert s.transporteur("DG" + "0" * 15)[0] == "Colis Privé"
+assert s.transporteur("1Z" + "A" * 16)[0] == "UPS"
+assert s.transporteur("XX")[0] is None
+try:
+    s.ship24("1Z" + "A" * 16)
+    raise SystemExit("clé absente non signalée")
+except RuntimeError as e:
+    assert "SHIP24_API_KEY" in str(e)
+' && [ -z "$(/usr/bin/python3 colis.py list)" ] ) || fail "scripts colis"
+
+# 3d. vocaux : --voice installe Whisper dans .venv, une seule fois
+"$T/repo/install.sh" --voice --yes >/dev/null
+grep -q "pip install -q faster-whisper" "$HOME/calls.log" || fail "Whisper non installé"
+"$T/repo/install.sh" --voice --yes >/dev/null
+[ "$(grep -c "pip install" "$HOME/calls.log")" = 1 ] || fail "Whisper réinstallé"
+
+# 3e. dépendance manquante : refusée sans terminal ni --yes, installée avec --yes (dans le HOME, sans sudo)
+rm "$B/bun"
+! setsid -w "$T/repo/install.sh" </dev/null 2>"$T/err" >/dev/null || fail "bun installé sans confirmation"
+grep -q "Refusé" "$T/err" || fail "refus non expliqué"
+! grep -q "bun.sh/install" "$HOME/calls.log" || fail "bun téléchargé sans confirmation"
+"$T/repo/install.sh" --yes >/dev/null 2>&1 || true # le faux curl n'installe rien : seul l'appel compte
+grep -q "bun.sh/install" "$HOME/calls.log" || fail "--yes n'installe pas bun"
+
+# 4. module inconnu : refusé
+! "$T/repo/install.sh" --starter=inexistant 2>/dev/null || fail "module inconnu accepté"
+echo "OK : tous les tests passent"
