@@ -132,6 +132,22 @@ assert a["ackReaction"] == "🔨", a
 mv "$T/python3.stub" "$B/python3"
 sed -i -e 's|^DISCORD_BOT_TOKEN=.*|DISCORD_BOT_TOKEN=|' -e 's|^DISCORD_ALLOWED_USERS=.*|DISCORD_ALLOWED_USERS=|' "$T/repo/.env"
 
+# 3g. Telegram : liste d'autorisation de .env écrite dans access.json (pas d'appairage), refusée si mal formée
+T_ACC="$HOME/.claude/channels/telegram/access.json"
+mv "$B/python3" "$T/python3.stub"
+sed -i 's|^TELEGRAM_ALLOWED_USERS=.*|TELEGRAM_ALLOWED_USERS=pseudo|' "$T/repo/.env"
+! "$T/repo/install.sh" 2>/dev/null >/dev/null || fail "ID Telegram non numérique accepté"
+sed -i 's|^TELEGRAM_ALLOWED_USERS=.*|TELEGRAM_ALLOWED_USERS=123456789|' "$T/repo/.env"
+"$T/repo/install.sh" >/dev/null
+/usr/bin/python3 -c '
+import json, sys
+a = json.load(open(sys.argv[1]))
+assert a["dmPolicy"] == "allowlist" and a["allowFrom"] == ["123456789"], a
+' "$T_ACC" || fail "access.json Telegram"
+[ "$(stat -c %a "$T_ACC")" = 600 ] || fail "droits access.json Telegram"
+mv "$T/python3.stub" "$B/python3"
+sed -i 's|^TELEGRAM_ALLOWED_USERS=.*|TELEGRAM_ALLOWED_USERS=|' "$T/repo/.env"
+
 # 3e. dépendance manquante : refusée sans terminal ni --yes, installée avec --yes (dans le HOME, sans sudo)
 rm "$B/bun"
 ! setsid -w "$T/repo/install.sh" </dev/null 2>"$T/err" >/dev/null || fail "bun installé sans confirmation"

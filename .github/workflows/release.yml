@@ -1,0 +1,21 @@
+name: release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tests d'installation (hors ligne, HOME jetable)
+        run: bash tests/test-install.sh
+      - name: Archives
+        run: |
+          git archive --format=tar.gz --prefix=artemis/ -o "artemis-${GITHUB_REF_NAME}.tar.gz" HEAD
+          git archive --format=zip --prefix=artemis/ -o "artemis-${GITHUB_REF_NAME}.zip" HEAD
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" artemis-*.tar.gz artemis-*.zip --generate-notes --title "Artemis $GITHUB_REF_NAME"

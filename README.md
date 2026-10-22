@@ -1,52 +1,47 @@
-# Artemis
+<div align="center">
 
-**Claude Code dans Telegram (et Discord en option).** Une session Claude Code tourne en permanence sur ta machine Linux (Raspberry Pi, serveur, PC) et tu lui écris depuis Telegram. Elle lit tes photos et documents, et garde sa mémoire dans un **coffre Obsidian** (des notes Markdown).
+# 🏹 Artemis
 
-- Session dans `tmux`, relancée par un service **systemd utilisateur** (plantage, redémarrage)
-- Plugin Telegram officiel (appairage, liste blanche) + commandes `/clear` `/usage` `/opus` `/sonnet`
-- Suivi de colis avec alertes Telegram (clé Ship24 gratuite)
-- Second cerveau Obsidian livré vide, avec modules facultatifs (cuisine…)
-- Vocaux et vidéos en option (Whisper)
+**Ton Claude Code, dans ta poche. Il tourne chez toi, il t'écrit sur Telegram et Discord, et il se souvient de tout.**
 
-## Prérequis
+*Un abonnement Claude · une machine Linux · 3 minutes.*
 
-- Linux avec systemd, ARM64 ou x86_64, `sudo`
-- Un abonnement **Claude** (Pro ou Max), sans clé API
-- Un compte **Telegram**
+</div>
 
-`install.sh` installe le reste en **demandant avant chaque étape** (`--yes` pour tout accepter) : `tmux curl unzip patch python3` via apt (seul usage de `sudo`), puis Node 22, bun et Claude Code dans ton dossier personnel.
+---
 
-## Installation (10 min)
+Tu envoies une photo de ticket de caisse, un vocal, un numéro de colis, une question de code. Une vraie session **Claude Code** tourne en permanence sur ta machine (Raspberry Pi, serveur, vieux PC), lit tes fichiers, agit, et te répond **là où tu es** : Telegram, Discord, ou les deux dans la même conversation.
 
-**1. Créer le bot.** Dans Telegram, ouvre **@BotFather** → `/newbot` → nom, puis identifiant finissant par `bot`. Garde le **jeton** (`123456789:AAH...`) : qui l'a contrôle le bot.
+## Pourquoi c'est différent
 
-**2. Récupérer Artemis.**
+- 🧠 **Un second cerveau qui reste.** Ses souvenirs sont des notes Markdown dans un coffre **Obsidian** que tu peux ouvrir et corriger. Tu le corriges une fois, il ne refait pas l'erreur. Il ne charge que l'`INDEX.md` puis les notes utiles, donc il économise ton contexte.
+- 💬 **Où tu veux.** Telegram et Discord dans **une seule session** : même mémoire, mêmes skills, mêmes agents.
+- 🎯 **Sonnet au quotidien, Opus quand ça compte.** Les questions difficiles partent sur un sous-agent Opus, la réponse revient dans ta conversation. `/opus` et `/sonnet` pour forcer.
+- 📦 **Skills et agents inclus.** Suivi de colis avec alertes, menus et courses depuis ton stock, vocaux et vidéos transcrits (Whisper). Ajoute les tiens en déposant un dossier.
+- 🔒 **Chez toi, à toi.** Pas de serveur tiers : ton abonnement Claude, tes fichiers. Liste blanche figée au démarrage, jetons en `chmod 600`, rien d'envoyé ailleurs.
+- 🛡️ **Indestructible.** Session `tmux` relancée par `systemd` : plantage, redémarrage, coupure, il revient.
+
+## Installation : 3 commandes
+
+**Avant** : un abonnement **Claude** (Pro ou Max, pas de clé API), Linux avec systemd, et un bot Telegram (`@BotFather` → `/newbot`, garde le jeton).
+
 ```bash
 git clone https://github.com/0xOzoo/artemis ~/artemis && cd ~/artemis
-```
-Ou télécharge l'archive dans les [Releases](https://github.com/0xOzoo/artemis/releases).
-
-**3. Connecter Claude.** `curl -fsSL https://claude.ai/install.sh | bash` si besoin, puis :
-```bash
-cd ~ && claude     # connexion, accepter le dossier, puis /exit
+curl -fsSL https://claude.ai/install.sh | bash && claude      # connexion, accepter le dossier, /exit
+./setup.sh --starter
 ```
 
-**4. Configurer.**
-```bash
-cp .env.example .env && nano .env     # TELEGRAM_BOT_TOKEN=<ton jeton>
-```
+`setup.sh` fait le reste, en te posant 2 questions :
 
-**5. Installer.**
-```bash
-./install.sh --starter     # + modules du coffre ; ajoute --voice (vocaux) ou --yes (sans questions)
-```
-Idempotent : relançable à volonté, n'écrase jamais une note du coffre.
+1. **Le jeton du bot** : il le vérifie auprès de Telegram.
+2. **Un message à ton bot** : il lit ton identifiant dans ce message et t'autorise tout seul. Plus d'appairage, plus de code à recopier.
 
-**6. Appairer ton compte.** Écris au bot : il répond par un code. Puis :
-```bash
-tmux attach -t artemis
-```
-Tape `/telegram:access pair <code>` puis `/telegram:access policy allowlist`. Détache-toi avec **Ctrl-b puis d** (pas Ctrl-c). Réécris au bot : Artemis répond.
+Ensuite il installe les dépendances (en **demandant avant chaque étape**, sans `sudo` sauf `apt`), branche le coffre Obsidian et lance le service. Écris à ton bot : Artemis répond.
+
+> Relançable à volonté : `setup.sh` et `install.sh` sont idempotents et n'écrasent jamais une note du coffre.
+> Options : `--yes` (tout accepter), `--voice` (vocaux et vidéos), `--starter=cuisine` (un module du coffre).
+
+**Discord en plus ?** `setup.sh` te le propose : il vérifie le jeton **et** que « Message Content Intent » est activé (l'erreur n°1), puis t'affiche le lien d'invitation. Détail dans [Discord](#discord-option).
 
 ## Le coffre Obsidian
 
@@ -93,8 +88,8 @@ Artemis répond aussi en message privé à un bot Discord (plugin officiel `disc
 1. [Discord Developer Portal](https://discord.com/developers/applications) → **New Application** → **Bot** : active **Message Content Intent**, désactive **Public Bot**, puis **Reset Token** et copie le jeton.
 2. **OAuth2 → URL Generator** : scope `bot`, permissions *View Channels, Send Messages, Read Message History, Attach Files, Add Reactions*. Ouvre l'URL et ajoute le bot à un serveur où tu es (Discord exige un serveur commun pour les MP).
 3. Ton ID : Paramètres → Avancés → **Mode développeur**, puis clic droit sur ton nom → **Copier l'identifiant**.
-4. Dans `.env` : `DISCORD_BOT_TOKEN=<jeton>` et `DISCORD_ALLOWED_USERS=<ton ID>` (plusieurs : séparés par des virgules ; **obligatoire**, l'installation refuse sans).
-5. `./install.sh && systemctl --user restart artemis`, puis écris au bot en MP.
+4. **Le plus simple** : `./setup.sh` (il demande le jeton et ton ID, vérifie l'intent, affiche le lien d'invitation). À la main : dans `.env`, `DISCORD_BOT_TOKEN=<jeton>` et `DISCORD_ALLOWED_USERS=<ton ID>` (plusieurs : séparés par des virgules ; **obligatoire**), puis `./install.sh && systemctl --user restart artemis`.
+5. Écris au bot en MP.
 
 Pas d'appairage : la liste de `.env` est la seule source, recopiée dans `~/.claude/channels/discord/access.json` et figée au démarrage (`DISCORD_ACCESS_MODE=static`). Les autres comptes sont ignorés sans réponse. Ajouter ou retirer quelqu'un : modifie `.env`, relance `./install.sh` et redémarre. Retirer Discord : vide `DISCORD_BOT_TOKEN`, redémarre.
 
@@ -116,12 +111,13 @@ Pas d'appairage : la liste de `.env` est la seule source, recopiée dans `~/.cla
 | Voir la session | `tmux attach -t artemis` (sortir : Ctrl-b puis d) |
 | Redémarrer / arrêter | `systemctl --user restart artemis` / `stop artemis` |
 | État | `systemctl --user status artemis` |
-| Qui a accès | `/telegram:access` dans la session |
+| Qui a accès | `TELEGRAM_ALLOWED_USERS` et `DISCORD_ALLOWED_USERS` dans `.env` |
 
 ## Dépannage
 
 | Problème | Solution |
 |---|---|
+| Discord : `Used disallowed intents` | Developer Portal → Bot → active **Message Content Intent**, puis `systemctl --user restart artemis` |
 | Le bot ne répond pas | `tmux attach -t artemis` : la session doit afficher l'invite de Claude, pas un écran de connexion ou de confiance. Sinon règle-le là |
 | Pas de serveur Telegram (`pgrep -af 'telegram/'` vide) | `claude mcp list` ; si `bun` est introuvable : `ln -s ~/.bun/bin/bun ~/.local/bin/bun` puis redémarre |
 | Serveur « à authentifier » | retire `plugin:telegram:telegram` de `~/.claude/mcp-needs-auth-cache.json`, redémarre |

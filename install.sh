@@ -48,6 +48,8 @@ set +a
 : "${VAULT_NAME:=cerveau}" "${VAULT_DIR:=$HOME/cerveau}" "${TMUX_SESSION:=artemis}"
 [[ "${TELEGRAM_BOT_TOKEN:-}" =~ ^[0-9]{5,15}:[A-Za-z0-9_-]{30,}$ ]] \
   || die "TELEGRAM_BOT_TOKEN absent ou mal formé dans .env (attendu : 123456789:ABC..., donné par @BotFather)"
+[[ -z "${TELEGRAM_ALLOWED_USERS:-}" || "$TELEGRAM_ALLOWED_USERS" =~ ^[0-9]{5,15}(,[0-9]{5,15})*$ ]] \
+  || die "TELEGRAM_ALLOWED_USERS mal formé dans .env (IDs numériques séparés par des virgules ; ./setup.sh le remplit seul)"
 if [ -n "${DISCORD_BOT_TOKEN:-}" ]; then
   [[ "$DISCORD_BOT_TOKEN" =~ ^[A-Za-z0-9_.-]{50,}$ ]] || die "DISCORD_BOT_TOKEN mal formé dans .env (jeton du Discord Developer Portal, onglet Bot)"
   [[ "${DISCORD_ALLOWED_USERS:-}" =~ ^[0-9]{15,22}(,[0-9]{15,22})*$ ]] \
@@ -89,7 +91,7 @@ command -v claude >/dev/null || die "claude introuvable"
 
 # --- 3. Compte Claude -------------------------------------------------------
 [ -s "$HOME/.claude/.credentials.json" ] || die "Claude Code n'est pas connecté. Lance : cd ~ && claude
-puis connecte-toi (abonnement Claude Pro/Max), accepte de faire confiance au dossier, quitte (/exit) et relance ./install.sh"
+puis connecte-toi (abonnement Claude Pro/Max), accepte de faire confiance au dossier, quitte (/exit) et relance ./setup.sh"
 
 # --- 4. Plugin telegram -----------------------------------------------------
 if ! claude plugin marketplace list 2>/dev/null | grep -q claude-plugins-official; then
@@ -110,6 +112,19 @@ STATE="${TELEGRAM_STATE_DIR:-$HOME/.claude/channels/telegram}"
 mkdir -p "$STATE" && chmod 700 "$STATE"
 ( umask 077; printf 'TELEGRAM_BOT_TOKEN=%s\n' "$TELEGRAM_BOT_TOKEN" > "$STATE/.env" )
 say "Jeton du bot enregistré dans $STATE/.env"
+if [ -n "${TELEGRAM_ALLOWED_USERS:-}" ]; then
+  # La liste de .env fait foi (artemis.sh fige le mode static) : rien à appairer.
+  python3 - "$STATE/access.json" "$TELEGRAM_ALLOWED_USERS" <<'PY'
+import json, sys
+f, ids = sys.argv[1], sys.argv[2].split(",")
+try: a = json.load(open(f))
+except (OSError, ValueError): a = {}
+a.update(dmPolicy="allowlist", allowFrom=ids, pending={})
+json.dump(a, open(f, "w"), indent=2)
+PY
+  chmod 600 "$STATE/access.json"
+  say "Telegram : liste d'autorisation (${TELEGRAM_ALLOWED_USERS}) enregistrée, pas d'appairage"
+fi
 
 # --- 4b. Plugin discord (facultatif, si DISCORD_BOT_TOKEN est rempli) -------
 if [ -n "${DISCORD_BOT_TOKEN:-}" ]; then
@@ -201,14 +216,20 @@ elif [ -f "$CU.timer" ]; then
 fi
 
 say "Artemis tourne (session tmux « $TMUX_SESSION »)."
-cat <<EOF
+if [ -n "${TELEGRAM_ALLOWED_USERS:-}" ]; then
+  echo "Prêt : écris à ton bot, Artemis répond."
+else
+  cat <<EOF
 
-Étape suivante, l'appairage :
+Étape suivante, l'appairage (ou lance ./setup.sh, qui le fait seul) :
   1. Écris n'importe quoi à ton bot sur Telegram : il répond par un code.
   2. Ici : tmux attach -t $TMUX_SESSION
      tape : /telegram:access pair <code>
      puis : /telegram:access policy allowlist
      et détache-toi avec Ctrl-b puis d.
+EOF
+fi
+cat <<EOF
 Après une modification de .env : ./install.sh puis systemctl --user restart artemis
 Après une mise à jour du plugin telegram : ./patch-telegram.sh puis systemctl --user restart artemis
 EOF
