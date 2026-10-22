@@ -1,6 +1,6 @@
 # Artemis
 
-**Claude Code dans Telegram.** Une session Claude Code tourne en permanence sur ta machine Linux (Raspberry Pi, serveur, PC) et tu lui écris depuis Telegram. Elle lit tes photos et documents, et garde sa mémoire dans un **coffre Obsidian** (des notes Markdown).
+**Claude Code dans Telegram (et Discord en option).** Une session Claude Code tourne en permanence sur ta machine Linux (Raspberry Pi, serveur, PC) et tu lui écris depuis Telegram. Elle lit tes photos et documents, et garde sa mémoire dans un **coffre Obsidian** (des notes Markdown).
 
 - Session dans `tmux`, relancée par un service **systemd utilisateur** (plantage, redémarrage)
 - Plugin Telegram officiel (appairage, liste blanche) + commandes `/clear` `/usage` `/opus` `/sonnet`
@@ -86,6 +86,18 @@ Envoie un numéro de suivi : Artemis détecte le transporteur (Colis Privé, Col
 
 Installées par `patch-telegram.sh` (écrit pour le plugin 0.0.7). **Une mise à jour du plugin l'écrase** : relance `./patch-telegram.sh && systemctl --user restart artemis`. Si le plugin a trop changé, le script s'arrête sans rien modifier et le bot marche sans ces commandes.
 
+## Discord (option)
+
+Artemis répond aussi en message privé à un bot Discord (plugin officiel `discord`), dans la même session que Telegram.
+
+1. [Discord Developer Portal](https://discord.com/developers/applications) → **New Application** → **Bot** : active **Message Content Intent**, désactive **Public Bot**, puis **Reset Token** et copie le jeton.
+2. **OAuth2 → URL Generator** : scope `bot`, permissions *View Channels, Send Messages, Read Message History, Attach Files, Add Reactions*. Ouvre l'URL et ajoute le bot à un serveur où tu es (Discord exige un serveur commun pour les MP).
+3. Ton ID : Paramètres → Avancés → **Mode développeur**, puis clic droit sur ton nom → **Copier l'identifiant**.
+4. Dans `.env` : `DISCORD_BOT_TOKEN=<jeton>` et `DISCORD_ALLOWED_USERS=<ton ID>` (plusieurs : séparés par des virgules ; **obligatoire**, l'installation refuse sans).
+5. `./install.sh && systemctl --user restart artemis`, puis écris au bot en MP.
+
+Pas d'appairage : la liste de `.env` est la seule source, recopiée dans `~/.claude/channels/discord/access.json` et figée au démarrage (`DISCORD_ACCESS_MODE=static`). Les autres comptes sont ignorés sans réponse. Ajouter ou retirer quelqu'un : modifie `.env`, relance `./install.sh` et redémarre. Retirer Discord : vide `DISCORD_BOT_TOKEN`, redémarre.
+
 ## Vocaux et vidéos (option)
 
 `./install.sh --voice` transcrit les vocaux et vidéos avec Whisper. Lourd : ~1 Go, lent sur petite carte ARM. Modèle réglable avec `WHISPER_MODEL` (`tiny` à `medium`). Sans cette option, Artemis répond qu'il ne lit pas les vocaux. Retrait : `rm -rf .venv`.
@@ -122,7 +134,8 @@ Installées par `patch-telegram.sh` (écrit pour le plugin 0.0.7). **Une mise à
 
 ## Sécurité
 
-- `.env` (jeton, clé Ship24) est en `chmod 600` et ignoré par git. Ne committe ni lui, ni `access.json`, ni `~/.claude/channels/telegram/.env`
+- `.env` (jetons, clé Ship24) est en `chmod 600` et ignoré par git. Ne committe ni lui, ni `access.json`, ni `~/.claude/channels/{telegram,discord}/.env`
+- Jeton Discord compromis : **Reset Token** dans le Developer Portal, nouveau jeton dans `.env`, `./install.sh` puis `systemctl --user restart artemis`
 - Toute personne de la liste blanche pilote Claude Code **sur ta machine**, avec tes fichiers : n'y mets que toi. Lis les demandes de permission avant d'accepter
 - Jeton compromis : `/revoke` chez @BotFather, nouveau jeton dans `.env`, `./install.sh` puis `systemctl --user restart artemis`
 

@@ -106,6 +106,32 @@ grep -q "pip install -q faster-whisper" "$HOME/calls.log" || fail "Whisper non i
 "$T/repo/install.sh" --voice --yes >/dev/null
 [ "$(grep -c "pip install" "$HOME/calls.log")" = 1 ] || fail "Whisper réinstallé"
 
+# 3f. Discord : liste d'autorisation obligatoire, jeton et access.json en 600, réglages gardés, rien sans jeton
+D="$HOME/.claude/channels/discord"
+[ ! -e "$D" ] || fail "Discord configuré sans jeton"
+mv "$B/python3" "$T/python3.stub" # vrai python3 : access.json doit vraiment être écrit
+sed -i 's|^DISCORD_BOT_TOKEN=.*|DISCORD_BOT_TOKEN=MTIzNDU2Nzg5MDEyMzQ1Njc4.GabcDe.test_test-test_test-test_test-test1234|' "$T/repo/.env"
+! "$T/repo/install.sh" 2>"$T/err" >/dev/null || fail "Discord accepté sans liste d'autorisation"
+grep -q DISCORD_ALLOWED_USERS "$T/err" || fail "liste d'autorisation manquante non expliquée"
+sed -i 's|^DISCORD_ALLOWED_USERS=.*|DISCORD_ALLOWED_USERS=pseudo|' "$T/repo/.env"
+! "$T/repo/install.sh" 2>/dev/null >/dev/null || fail "ID Discord non numérique accepté"
+sed -i 's|^DISCORD_ALLOWED_USERS=.*|DISCORD_ALLOWED_USERS=184695080709324800,221773638772129792|' "$T/repo/.env"
+mkdir -p "$D" && echo '{"dmPolicy":"pairing","allowFrom":["999999999999999999"],"ackReaction":"🔨"}' > "$D/access.json"
+"$T/repo/install.sh" >/dev/null
+grep -q "plugin install discord@claude-plugins-official" "$HOME/calls.log" || fail "plugin discord non installé"
+grep -q "plugin disable discord@claude-plugins-official" "$HOME/calls.log" || fail "plugin discord non désactivé globalement"
+[ "$(stat -c %a "$D/.env")" = 600 ] && [ "$(stat -c %a "$D/access.json")" = 600 ] || fail "droits des fichiers Discord"
+grep -qx 'DISCORD_BOT_TOKEN=MTIzNDU2Nzg5MDEyMzQ1Njc4.GabcDe.test_test-test_test-test_test-test1234' "$D/.env" || fail "jeton Discord"
+/usr/bin/python3 -c '
+import json, sys
+a = json.load(open(sys.argv[1]))
+assert a["dmPolicy"] == "allowlist", a
+assert a["allowFrom"] == ["184695080709324800", "221773638772129792"], a
+assert a["ackReaction"] == "🔨", a
+' "$D/access.json" || fail "access.json Discord"
+mv "$T/python3.stub" "$B/python3"
+sed -i -e 's|^DISCORD_BOT_TOKEN=.*|DISCORD_BOT_TOKEN=|' -e 's|^DISCORD_ALLOWED_USERS=.*|DISCORD_ALLOWED_USERS=|' "$T/repo/.env"
+
 # 3e. dépendance manquante : refusée sans terminal ni --yes, installée avec --yes (dans le HOME, sans sudo)
 rm "$B/bun"
 ! setsid -w "$T/repo/install.sh" </dev/null 2>"$T/err" >/dev/null || fail "bun installé sans confirmation"

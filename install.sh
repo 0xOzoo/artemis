@@ -48,6 +48,11 @@ set +a
 : "${VAULT_NAME:=cerveau}" "${VAULT_DIR:=$HOME/cerveau}" "${TMUX_SESSION:=artemis}"
 [[ "${TELEGRAM_BOT_TOKEN:-}" =~ ^[0-9]{5,15}:[A-Za-z0-9_-]{30,}$ ]] \
   || die "TELEGRAM_BOT_TOKEN absent ou mal formé dans .env (attendu : 123456789:ABC..., donné par @BotFather)"
+if [ -n "${DISCORD_BOT_TOKEN:-}" ]; then
+  [[ "$DISCORD_BOT_TOKEN" =~ ^[A-Za-z0-9_.-]{50,}$ ]] || die "DISCORD_BOT_TOKEN mal formé dans .env (jeton du Discord Developer Portal, onglet Bot)"
+  [[ "${DISCORD_ALLOWED_USERS:-}" =~ ^[0-9]{15,22}(,[0-9]{15,22})*$ ]] \
+    || die "DISCORD_ALLOWED_USERS obligatoire avec Discord : IDs utilisateur numériques séparés par des virgules"
+fi
 [[ "$VAULT_NAME" =~ ^[A-Za-z0-9_-]+$ ]] || die "VAULT_NAME : lettres, chiffres, - et _ seulement"
 [[ "$TMUX_SESSION" =~ ^[A-Za-z0-9_-]+$ ]] || die "TMUX_SESSION : lettres, chiffres, - et _ seulement"
 
@@ -105,6 +110,29 @@ STATE="${TELEGRAM_STATE_DIR:-$HOME/.claude/channels/telegram}"
 mkdir -p "$STATE" && chmod 700 "$STATE"
 ( umask 077; printf 'TELEGRAM_BOT_TOKEN=%s\n' "$TELEGRAM_BOT_TOKEN" > "$STATE/.env" )
 say "Jeton du bot enregistré dans $STATE/.env"
+
+# --- 4b. Plugin discord (facultatif, si DISCORD_BOT_TOKEN est rempli) -------
+if [ -n "${DISCORD_BOT_TOKEN:-}" ]; then
+  if ! claude plugin list 2>/dev/null | grep -q 'discord@claude-plugins-official'; then
+    say "Installation du plugin discord"
+    claude plugin install discord@claude-plugins-official
+  fi
+  claude plugin disable discord@claude-plugins-official >/dev/null 2>&1 || true
+  DSTATE="${DISCORD_STATE_DIR:-$HOME/.claude/channels/discord}"
+  mkdir -p "$DSTATE" && chmod 700 "$DSTATE"
+  ( umask 077; printf 'DISCORD_BOT_TOKEN=%s\n' "$DISCORD_BOT_TOKEN" > "$DSTATE/.env" )
+  # La liste de .env fait foi : allowlist stricte (pas d'appairage), les autres réglages du fichier sont gardés.
+  python3 - "$DSTATE/access.json" "$DISCORD_ALLOWED_USERS" <<'PY'
+import json, sys
+f, ids = sys.argv[1], sys.argv[2].split(",")
+try: a = json.load(open(f))
+except (OSError, ValueError): a = {}
+a.update(dmPolicy="allowlist", allowFrom=ids, pending={})
+json.dump(a, open(f, "w"), indent=2)
+PY
+  chmod 600 "$DSTATE/access.json"
+  say "Discord : jeton et liste d'autorisation (${DISCORD_ALLOWED_USERS}) enregistrés dans $DSTATE"
+fi
 
 # --- 5. Coffre Obsidian -----------------------------------------------------
 mkdir -p "$VAULT_DIR"
