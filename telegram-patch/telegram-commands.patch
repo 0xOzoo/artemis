@@ -10,7 +10,7 @@
  import { join, extname, sep } from 'path'
  
  const STATE_DIR = process.env.TELEGRAM_STATE_DIR
-@@ -732,6 +733,121 @@
+@@ -732,6 +733,134 @@
    await ctx.reply(`Not paired. Send me a message to get a pairing code.`)
  })
  
@@ -66,8 +66,21 @@
 +    await new Promise(r => setTimeout(r, 4000))
 +    const pane = execFileSync('tmux', ['capture-pane', '-pt', TMUX_TARGET], { encoding: 'utf8' })
 +    tmuxKeys('Escape')
-+    const text = pane.split('\n').map(l => l.trimEnd()).filter(l => l.trim()).join('\n')
-+    await ctx.reply(text.slice(0, 4000) || '(écran vide)')
++    const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
++    const lines = pane.split('\n').map(l => l.trim()).filter(Boolean)
++    const bar = (p: number) => '█'.repeat(Math.round(p / 10)) + '░'.repeat(10 - Math.round(p / 10))
++    const out: string[] = ['📊 <b>Usage Artemis</b>']
++    for (let i = 1; i < lines.length; i++) {
++      const m = lines[i]!.match(/(\d+)% used/)
++      if (!m) continue
++      const label = lines[i - 1]!.startsWith('Current') ? lines[i - 1]! : lines[i - 2] ?? ''
++      const reset = lines[i + 1]?.startsWith('Resets') ? lines[i + 1]!.replace('Resets ', '') : ''
++      out.push(`\n<b>${esc(label.replace(/^Current /, '').replace(/^./, c => c.toUpperCase()))}</b>\n<code>${bar(Number(m[1]))}</code> <b>${m[1]}%</b>${reset ? '\n↻ ' + esc(reset) : ''}`)
++    }
++    const tips = lines.filter(l => /^\d+%\s+\S/.test(l)).slice(0, 3)
++    if (tips.length) out.push('\n<b>Ce qui consomme</b>\n' + tips.map(t => '• ' + esc(t.replace(/\s+/, ' '))).join('\n'))
++    if (out.length === 1) out.push('<pre>' + esc(lines.join('\n').slice(0, 1900) || '(écran vide)') + '</pre>')
++    await ctx.reply(out.join('\n'), { parse_mode: 'HTML' })
 +  } catch (e) {
 +    await ctx.reply(`Échec /usage : ${e}`)
 +  }
@@ -132,7 +145,7 @@
  // Inline-button handler for permission requests. Callback data is
  // `perm:allow:<id>`, `perm:deny:<id>`, or `perm:more:<id>`.
  // Security mirrors the text-reply path: allowFrom must contain the sender.
-@@ -963,7 +1079,15 @@
+@@ -963,7 +1092,15 @@
        .catch(() => {})
    }
  
@@ -149,7 +162,7 @@
  
    // image_path goes in meta only — an in-content "[image attached — read: PATH]"
    // annotation is forgeable by any allowlisted sender typing that string.
-@@ -1016,6 +1140,10 @@
+@@ -1016,6 +1153,10 @@
                { command: 'start', description: 'Welcome and setup guide' },
                { command: 'help', description: 'What this bot can do' },
                { command: 'status', description: 'Check your pairing status' },

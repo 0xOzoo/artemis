@@ -142,7 +142,7 @@ Pas d'appairage : la liste de `.env` est la seule source, recopiée dans `~/.cla
 | Le bot se tait quand j'ouvre `claude` ailleurs | un seul lecteur par bot : garde le plugin telegram **désactivé globalement** et n'utilise pas le jeton ailleurs |
 | MCP obsidian absent | il exige Node ≥ 22 dans le PATH du service : relance `./install.sh` |
 | Artemis s'arrête à la déconnexion | `sudo loginctl enable-linger $USER` |
-| `/clear` ou `/usage` ne répondent plus | `./patch-telegram.sh && systemctl --user restart artemis` |
+| `/clear` ou `/usage` (Telegram ou Discord) ne répondent plus | `./patch-telegram.sh && systemctl --user restart artemis` |
 | Vocal non compris | installe avec `--voice`, vérifie le patch ; limite Telegram : 20 Mo |
 | Pas d'alerte colis | `SHIP24_API_KEY` remplie, `./install.sh` relancé, puis `journalctl --user -u artemis-colis` |
 

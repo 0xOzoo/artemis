@@ -2,6 +2,10 @@
 
 Chaque version : ce qui change pour toi, en clair. Rien à faire sauf mention « À faire ».
 
+## v0.1.4
+- **Nouveau** : `/usage` sur Discord (carte avec barres de consommation et heures de reset) et `/usage` plus lisible sur Telegram
+- **À faire** : `./update.sh` (réapplique le patch des plugins, puis redémarre)
+
 ## v0.1.3
 - **Nouveau** : Artemis te prévient sur Telegram quand une nouvelle version existe (une fois par version, jamais de spam)
 - **Nouveau** : `./update.sh` met tout à jour d'une commande

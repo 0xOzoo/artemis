@@ -1,0 +1,59 @@
+--- a/server.ts
++++ b/server.ts
+@@ -25,14 +25,17 @@
+   ButtonBuilder,
+   ButtonStyle,
+   ActionRowBuilder,
++  EmbedBuilder,
+   type Message,
+   type Attachment,
+   type Interaction,
+ } from 'discord.js'
+ import { randomBytes } from 'crypto'
++import { execFileSync } from 'child_process'
+ import { readFileSync, writeFileSync, mkdirSync, readdirSync, rmSync, statSync, renameSync, realpathSync, chmodSync } from 'fs'
+ import { homedir } from 'os'
+ import { join, sep } from 'path'
++const TMUX_TARGET = process.env.TMUX_SESSION || 'artemis'
+ 
+ const STATE_DIR = process.env.DISCORD_STATE_DIR ?? join(homedir(), '.claude', 'channels', 'discord')
+ const ACCESS_FILE = join(STATE_DIR, 'access.json')
+@@ -848,6 +851,38 @@
+     return
+   }
+ 
++  // ARTEMIS-PATCH : « /usage » tapé dans le chat = écran /usage de la session (tmux), renvoyé tel quel. Allowlist seulement.
++  if (msg.content.trim().toLowerCase() === '/usage' && result.access.allowFrom.includes(msg.author.id)) {
++    try {
++      execFileSync('tmux', ['send-keys', '-t', TMUX_TARGET, '-l', '/usage'])
++      execFileSync('tmux', ['send-keys', '-t', TMUX_TARGET, 'Enter'])
++      await new Promise(r => setTimeout(r, 4000))
++      const pane = execFileSync('tmux', ['capture-pane', '-pt', TMUX_TARGET], { encoding: 'utf8' })
++      execFileSync('tmux', ['send-keys', '-t', TMUX_TARGET, 'Escape'])
++      const lines = pane.split('\n').map(l => l.trim()).filter(Boolean)
++      const embed = new EmbedBuilder().setTitle('📊 Usage Artemis').setColor(0x5865f2)
++      const bar = (p: number) => '█'.repeat(Math.round(p / 10)) + '░'.repeat(10 - Math.round(p / 10))
++      for (let i = 0; i < lines.length; i++) {
++        const m = lines[i]!.match(/(\d+)% used/)
++        if (!m || i === 0) continue
++        const label = lines[i - 1]!.startsWith('Current') ? lines[i - 1]! : lines[i - 2] ?? ''
++        const reset = lines[i + 1]?.startsWith('Resets') ? lines[i + 1] : ''
++        const p = Number(m[1])
++        embed.addFields({ name: label.replace(/^Current /, '').replace(/^./, c => c.toUpperCase()), value: `\`${bar(p)}\` **${p}%**\n${reset ? '↻ ' + reset.replace('Resets ', '') : ''}` })
++      }
++      const tips = lines.filter(l => /^\d+%\s+\S/.test(l)).slice(0, 3)
++      if (tips.length) embed.addFields({ name: 'Ce qui consomme', value: tips.map(t => '• ' + t.replace(/\s+/, ' ')).join('\n') })
++      if (!embed.data.fields?.length) {
++        await msg.reply('```\n' + (lines.join('\n').slice(0, 1900) || '(écran vide)') + '\n```')
++      } else {
++        await msg.reply({ embeds: [embed] })
++      }
++    } catch (e) {
++      await msg.reply(`Échec /usage : ${e}`).catch(() => {})
++    }
++    return
++  }
++
+   // Typing indicator — signals "processing" until we reply (or ~10s elapses).
+   if ('sendTyping' in msg.channel) {
+     void msg.channel.sendTyping().catch(() => {})
