@@ -1,0 +1,7 @@
+[Unit]
+Description=Artemis : envoie sur Telegram les rappels échus
+
+[Service]
+Type=oneshot
+WorkingDirectory=@INSTALL_DIR@/rappel
+ExecStart=/usr/bin/env python3 rappel.py check

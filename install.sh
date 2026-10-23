@@ -215,6 +215,14 @@ elif [ -f "$CU.timer" ]; then
   say "SHIP24_API_KEY vide : alerte colis retirée"
 fi
 
+# --- 9. Rappels (toujours actif, sans clé) -----------------------------------
+RU="$HOME/.config/systemd/user/artemis-rappel"
+sed "s|@INSTALL_DIR@|$DIR|g" "$DIR/systemd/artemis-rappel.service.in" > "$RU.service"
+cp "$DIR/systemd/artemis-rappel.timer" "$RU.timer"
+systemctl --user daemon-reload
+systemctl --user enable --now artemis-rappel.timer
+say "Rappels actifs (chaque minute)"
+
 say "Artemis tourne (session tmux « $TMUX_SESSION »)."
 if [ -n "${TELEGRAM_ALLOWED_USERS:-}" ]; then
   echo "Prêt : écris à ton bot, Artemis répond."

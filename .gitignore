@@ -9,3 +9,4 @@ __pycache__/
 .venv/
 node_modules/
 colis/colis.json
+rappel/rappels.json

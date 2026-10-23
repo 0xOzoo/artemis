@@ -100,6 +100,16 @@ except RuntimeError as e:
     assert "SHIP24_API_KEY" in str(e)
 ' && [ -z "$(/usr/bin/python3 colis.py list)" ] ) || fail "scripts colis"
 
+# 3c bis. rappels : timer toujours installé ; add trie et refuse un format invalide, rm retire, rien d'échu = aucun envoi
+RU="$HOME/.config/systemd/user/artemis-rappel"
+grep -q "WorkingDirectory=$T/repo/rappel" "$RU.service" && [ -f "$RU.timer" ] || fail "timer rappel absent ou mal rempli"
+grep -q "enable --now artemis-rappel.timer" "$HOME/calls.log" || fail "timer rappel non activé"
+( cd "$T/repo/rappel" && export RAPPEL_FILE="$T/rappels.json" && R="/usr/bin/python3 rappel.py" \
+  && $R add "2999-01-02 09:00" "deux" >/dev/null && $R add "2999-01-01 08:00" "un" >/dev/null \
+  && ! $R add "lundi 18h" "x" 2>/dev/null \
+  && [ "$($R list | head -1)" = "0 2999-01-01 08:00 un" ] \
+  && $R check && $R rm 0 && [ "$($R list)" = "0 2999-01-02 09:00 deux" ] ) || fail "script rappel"
+
 # 3d. vocaux : --voice installe Whisper dans .venv, une seule fois
 "$T/repo/install.sh" --voice --yes >/dev/null
 grep -q "pip install -q faster-whisper" "$HOME/calls.log" || fail "Whisper non installé"

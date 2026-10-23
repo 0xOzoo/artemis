@@ -55,7 +55,7 @@ Par défaut `~/cerveau` (`VAULT_DIR` dans `.env`). Ouvre-le dans Obsidian si tu 
 
 | Module | Contenu | Skill associée |
 |---|---|---|
-| `cuisine` | profil et stock, recettes, menus et courses | `courses` |
+| `cuisine` | profil et stock, recettes, menus et courses | `courses`, `recette-tiktok` |
 
 Notes vides, sauf des exemples marqués `(exemple fictif)`. Dis simplement à Artemis « je n'aime pas le poisson » ou « il me reste 1 kg de riz » : il met les notes à jour.
 
@@ -70,6 +70,18 @@ Envoie un numéro de suivi : Artemis détecte le transporteur (Colis Privé, Col
 - **Colis Privé** : sans clé. **Les autres** : clé gratuite sur [ship24.com](https://www.ship24.com), à mettre dans `.env` (`SHIP24_API_KEY=`)
 - Avec la clé, `./install.sh` active un timer (toutes les 30 min) qui t'alerte à chaque changement de statut. Destinataire : `TELEGRAM_CHAT_ID`, sinon le premier compte appairé
 - Journal : `journalctl --user -u artemis-colis`
+
+## Rappels
+
+« Rappelle-moi lundi 18h30 de sortir les poubelles » : Artemis calcule la date exacte, te la confirme et l'ajoute (`rappel/rappel.py`, skill `rappel`).
+
+- Toujours actif, sans clé : `./install.sh` installe un timer (chaque minute) qui t'envoie le rappel sur Telegram, au même destinataire que l'alerte colis
+- Lister / annuler : demande-le, ou `python3 rappel/rappel.py list` puis `rm <n>`
+- Journal : `journalctl --user -u artemis-rappel`
+
+## Recettes TikTok
+
+Envoie un lien TikTok de cuisine : Artemis lit la légende (sans navigateur), la convertit en fiche au format du module `cuisine` et l'ajoute à `cuisine/recettes.md` avec sa ligne d'index (skill `recette-tiktok`). Si rien n'est lisible, il te le dit au lieu d'inventer.
 
 ## Commandes Telegram
 

@@ -1,0 +1,9 @@
+[Unit]
+Description=Artemis : vérifie les rappels chaque minute
+
+[Timer]
+OnCalendar=*:*
+Persistent=true
+
+[Install]
+WantedBy=timers.target
