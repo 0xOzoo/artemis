@@ -79,6 +79,12 @@ Envoie un numéro de suivi : Artemis détecte le transporteur (Colis Privé, Col
 - Lister / annuler : demande-le, ou `python3 rappel/rappel.py list` puis `rm <n>`
 - Journal : `journalctl --user -u artemis-rappel`
 
+## Mises à jour
+
+- Chaque semaine, un timer (`artemis-update`) compare ta `VERSION` à la dernière release GitHub et t'écrit sur Telegram **une seule fois** par nouvelle version, avec le lien des nouveautés
+- Pour mettre à jour : `./update.sh` (git pull, `./install.sh`, redémarrage). Un dossier téléchargé en archive (sans `.git`) se met à jour en retéléchargeant la release
+- Option : « Watch → Custom → Releases » sur GitHub pour être prévenu par mail
+
 ## Recettes TikTok
 
 Envoie un lien TikTok de cuisine : Artemis lit la légende (sans navigateur), la convertit en fiche au format du module `cuisine` et l'ajoute à `cuisine/recettes.md` avec sa ligne d'index (skill `recette-tiktok`). Si rien n'est lisible, il te le dit au lieu d'inventer.

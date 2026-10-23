@@ -110,6 +110,19 @@ grep -q "enable --now artemis-rappel.timer" "$HOME/calls.log" || fail "timer rap
   && [ "$($R list | head -1)" = "0 2999-01-01 08:00 un" ] \
   && $R check && $R rm 0 && [ "$($R list)" = "0 2999-01-02 09:00 deux" ] ) || fail "script rappel"
 
+# 3c ter. mise à jour : timer installé ; comparaison de versions ; update.sh refuse un dossier sans git
+UU="$HOME/.config/systemd/user/artemis-update"
+grep -q "WorkingDirectory=$T/repo/update" "$UU.service" && [ -f "$UU.timer" ] || fail "timer update absent ou mal rempli"
+grep -q "enable --now artemis-update.timer" "$HOME/calls.log" || fail "timer update non activé"
+( cd "$T/repo/update" && /usr/bin/python3 -c '
+import check
+assert check.plus_recente("0.1.2", "v0.1.3") and check.plus_recente("0.9.0", "v0.10.0")
+assert not check.plus_recente("0.1.2", "v0.1.2") and not check.plus_recente("0.2.0", "v0.1.9")
+' ) || fail "comparaison de versions"
+
+# 3c quater. patch notes : CHANGELOG.md doit avoir une section pour la VERSION courante
+( cd "$T/repo" && [ -n "$(update/notes.sh)" ] ) || fail "pas de notes pour la VERSION courante"
+
 # 3d. vocaux : --voice installe Whisper dans .venv, une seule fois
 "$T/repo/install.sh" --voice --yes >/dev/null
 grep -q "pip install -q faster-whisper" "$HOME/calls.log" || fail "Whisper non installé"

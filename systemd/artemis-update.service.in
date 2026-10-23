@@ -1,0 +1,7 @@
+[Unit]
+Description=Artemis : prévient sur Telegram d'une nouvelle release
+
+[Service]
+Type=oneshot
+WorkingDirectory=@INSTALL_DIR@/update
+ExecStart=/usr/bin/env python3 check.py

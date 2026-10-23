@@ -223,6 +223,14 @@ systemctl --user daemon-reload
 systemctl --user enable --now artemis-rappel.timer
 say "Rappels actifs (chaque minute)"
 
+# --- 10. Alerte de mise à jour (toujours active, sans clé) ------------------
+UU="$HOME/.config/systemd/user/artemis-update"
+sed "s|@INSTALL_DIR@|$DIR|g" "$DIR/systemd/artemis-update.service.in" > "$UU.service"
+cp "$DIR/systemd/artemis-update.timer" "$UU.timer"
+systemctl --user daemon-reload
+systemctl --user enable --now artemis-update.timer
+say "Alerte de mise à jour active (chaque semaine)"
+
 say "Artemis tourne (session tmux « $TMUX_SESSION »)."
 if [ -n "${TELEGRAM_ALLOWED_USERS:-}" ]; then
   echo "Prêt : écris à ton bot, Artemis répond."

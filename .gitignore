@@ -10,3 +10,4 @@ __pycache__/
 node_modules/
 colis/colis.json
 rappel/rappels.json
+update/derniere-annoncee.txt

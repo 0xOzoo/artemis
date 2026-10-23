@@ -15,7 +15,9 @@ jobs:
         run: |
           git archive --format=tar.gz --prefix=artemis/ -o "artemis-${GITHUB_REF_NAME}.tar.gz" HEAD
           git archive --format=zip --prefix=artemis/ -o "artemis-${GITHUB_REF_NAME}.zip" HEAD
+      - name: Notes de version (CHANGELOG.md obligatoire)
+        run: bash update/notes.sh "$GITHUB_REF_NAME" > notes.md
       - name: Release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" artemis-*.tar.gz artemis-*.zip --generate-notes --title "Artemis $GITHUB_REF_NAME"
+        run: gh release create "$GITHUB_REF_NAME" artemis-*.tar.gz artemis-*.zip --notes-file notes.md --title "Artemis $GITHUB_REF_NAME"
