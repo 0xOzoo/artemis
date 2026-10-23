@@ -16,9 +16,9 @@ obsidian, `vault:` le nom donné dans la consigne système (par défaut `cerveau
 | Ce qu'on a appris | Où |
 |---|---|
 | Un piège transposable (un filtre, un seuil, un cache, une boucle) | `lecons/<slug>.md` |
-| L'état d'un projet, ce qu'il ne faut pas toucher | `projets/<projet>.md` |
+| L'état d'un projet, ce qu'il ne faut pas toucher | `homelab/projets/<projet>/<projet>.md` (une note par feature à côté ; un coffre ancien garde son `projets/<projet>.md`) |
 | Une correction de l'utilisateur sur ma façon de travailler | `workflow/erreurs-et-correctifs.md`, **le jour même** |
-| Un fait de machine (service, cron, disque, accès) | `infra/<sujet>.md` |
+| Un fait de machine (service, cron, disque, accès) | `homelab/infra/<sujet>.md` (ou `infra/` si le coffre est ancien) |
 | Une préférence ou une info personnelle que l'utilisateur veut garder | `perso/<sujet>.md` |
 
 ## Comment

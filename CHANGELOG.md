@@ -4,6 +4,7 @@ Chaque version : ce qui change pour toi, en clair. Rien à faire sauf mention «
 
 ## v0.1.4
 - **Nouveau** : `/usage` sur Discord (carte avec barres de consommation et heures de reset) et `/usage` plus lisible sur Telegram
+- **Nouveau** : le coffre des nouvelles installations est rangé en `homelab/` (`infra/` + `projets/<projet>/`) ; ton coffre existant n'est pas touché
 - **À faire** : `./update.sh` (réapplique le patch des plugins, puis redémarre)
 
 ## v0.1.3

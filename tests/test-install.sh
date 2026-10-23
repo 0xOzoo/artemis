@@ -62,6 +62,8 @@ grep -q "note perso" "$HOME/cerveau/cuisine/recettes.md" || fail "note de l'util
 grep -q "plugin disable telegram@claude-plugins-official" "$HOME/calls.log" || fail "plugin non désactivé globalement"
 grep -q "mcp add -s user obsidian" "$HOME/calls.log" || fail "MCP obsidian non ajouté"
 
+[ -d "$HOME/cerveau/homelab/projets" ] && [ -d "$HOME/cerveau/homelab/infra" ] || fail "arborescence homelab/ absente du coffre"
+
 # 3b. patch du plugin telegram : appliqué une fois, original sauvé
 [ "$(grep -c ARTEMIS-PATCH "$PLUG/server.ts")" = 1 ] || fail "patch telegram non appliqué (ou deux fois)"
 cmp -s "$PLUG/server.ts.orig" "$T/server.ts.pristine" || fail "original du plugin non sauvé"

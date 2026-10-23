@@ -8,6 +8,17 @@ Ce dossier est de la documentation, pas du code. Obsidian le lit tel quel (*Ouvr
 3. Besoin d'un détail précis : `obsidian_search_vault` (`mode: "content"`, `scope:` le dossier concerné) puis lire la note trouvée, jamais le dossier entier.
 4. Ne pas recopier ici ce qui vit déjà dans un fichier d'un projet : mettre son chemin. Un lien symbolique est illisible par le MCP (`SYMLINK_NOT_ALLOWED`).
 
+## Rangement
+```
+INDEX.md  CLAUDE.md
+homelab/infra/              un fait de machine (service, cron, disque, accès)
+homelab/projets/<projet>/   l'état d'un projet (<projet>.md) + ses notes de features, rapports datés
+lecons/                     pièges transposables, liés à aucun projet
+workflow/                   corrections de l'utilisateur sur ma façon de travailler
+perso/, cuisine/, …         le reste de sa vie (modules du starter)
+```
+Un projet qui grossit garde **un dossier**, une note d'état + une note par feature, jamais tout en vrac à la racine. Un coffre ancien avec `projets/` ou `infra/` à la racine continue de marcher : l'INDEX est le seul point d'entrée.
+
 ## Écriture
 Nouvelle note quand un savoir a coûté cher à obtenir et resservira : une leçon, un état de projet, un fait d'infra, une préférence.
 
